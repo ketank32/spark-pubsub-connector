@@ -1,33 +1,37 @@
 # Spark Pub/Sub Connector
 
-A **simple Apache Spark connector for Google Cloud Pub/Sub** that supports **reading and writing streaming data** using **Spark Structured Streaming**.
+![Build](https://img.shields.io/badge/build-maven-blue)
+![Scala](https://img.shields.io/badge/scala-2.12-red)
+![License](https://img.shields.io/badge/license-Apache%202.0-green)
 
-This project provides a custom Spark DataSource implementation that allows Spark jobs to consume messages from Pub/Sub subscriptions and publish messages to Pub/Sub topics.
+A **production‑ready Apache Spark connector for Google Cloud Pub/Sub** that supports **reading and writing streaming data** using **Spark Structured Streaming**.
+
+This connector implements a custom **Spark DataSource (V1)** that enables Spark applications to consume messages from **Pub/Sub subscriptions** and publish messages to **Pub/Sub topics** in a scalable and fault‑tolerant way.
 
 ---
 
 ## Features
 
-* Read data from **Google Cloud Pub/Sub** using Spark Structured Streaming
-* Write streaming data from Spark to **Pub/Sub topics**
-* Works with **Spark DataSource V1**
-* Implemented in **Scala**
+* Structured Streaming **source** for Google Cloud Pub/Sub
+* Structured Streaming **sink** for Pub/Sub topics
+* Automatic schema inference
+* Offset tracking for exactly‑once semantics (best effort)
+* Written in **Scala**, optimized for Spark 3.x
 
 ---
 
 ## Requirements
 
-* Apache Spark 3.x
-* Java 8+
+* Apache Spark **3.x**
+* Java **8+**
 * Maven
-* Google Cloud Pub/Sub project, topic, and subscription
-* Google Cloud credentials configured
+* Google Cloud Pub/Sub project
+* Pub/Sub topic and subscription
+* Google Cloud authentication configured (ADC or service account)
 
 ---
 
 ## Build
-
-Clone the repository and build using Maven:
 
 ```bash
 git clone https://github.com/ketank32/spark-pubsub-connector.git
@@ -35,19 +39,23 @@ cd spark-pubsub-connector
 mvn clean package
 ```
 
-The build will generate a JAR under the `target/` directory.
+The JAR will be generated under:
+
+```
+target/spark-pubsub-connector-<version>.jar
+```
 
 ---
 
 ## Usage
 
-### Read from Pub/Sub (Structured Streaming)
+### Read from Pub/Sub
 
 ```scala
 val df = spark.readStream
   .format("pubsub")
-  .option("projectId", "your-gcp-project")
-  .option("subscription", "projects/PROJECT_ID/subscriptions/SUBSCRIPTION_NAME")
+  .option("projectId", "my-gcp-project")
+  .option("subscription", "projects/my-gcp-project/subscriptions/my-sub")
   .load()
 
 val query = df.writeStream
@@ -64,11 +72,43 @@ query.awaitTermination()
 ```scala
 df.writeStream
   .format("pubsub")
-  .option("projectId", "your-gcp-project")
-  .option("topic", "projects/PROJECT_ID/topics/TOPIC_NAME")
+  .option("projectId", "my-gcp-project")
+  .option("topic", "projects/my-gcp-project/topics/my-topic")
   .option("checkpointLocation", "/tmp/pubsub-checkpoint")
   .start()
 ```
+
+---
+
+## Configuration Options
+
+| Option Key           | Required     | Description                    |
+| -------------------- | ------------ | ------------------------------ |
+| `projectId`          | Yes          | Google Cloud project ID        |
+| `subscription`       | Yes (source) | Full Pub/Sub subscription path |
+| `topic`              | Yes (sink)   | Full Pub/Sub topic path        |
+| `checkpointLocation` | Yes (sink)   | Spark checkpoint directory     |
+
+Authentication is handled using **Google Application Default Credentials** or service account credentials provided to the Spark runtime.
+
+---
+
+## Schema
+
+The source produces a fixed schema inferred from `PubSubMessage`:
+
+```text
+subscription        STRING
+offset              LONG
+data                BINARY
+publish_timestamp   LONG
+event_timestamp     LONG
+attributes          STRING
+message_id          STRING
+```
+
+* `data` contains the raw Pub/Sub payload
+* Timestamps are represented as epoch milliseconds
 
 ---
 
@@ -90,30 +130,25 @@ spark-submit \
 src/main/scala/io/github/ketank32/spark/pubsub
 ├── DefaultSource.scala
 ├── PubSubStreamingSource.scala
-├── PubSubStreamingSink.scala
-├── PubSubUtil.scala
+├── PubSubStreamingSinkProvider.scala
 ├── PubSubMessage.scala
-```
-
-Test examples are available under:
-
-```
-src/main/scala/test
+├── PubSubUtil.scala
+├── PubSubSourceOffset.scala
 ```
 
 ---
 
 ## Limitations
 
-* DataSource V1 implementation
-* Limited configuration options (can be extended)
-* Basic message schema
+* Uses Spark **DataSource V1** (V2 not yet supported)
+* Message attributes are serialized as a string
+* No built‑in schema registry
 
 ---
 
 ## Contributing
 
-Contributions are welcome. Please open an issue or submit a pull request.
+Contributions, issues, and feature requests are welcome.
 
 ---
 
